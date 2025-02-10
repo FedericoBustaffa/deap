@@ -25,8 +25,11 @@ You are encouraged to write your own algorithms in order to make them do what
 you really want them to do.
 """
 
+import multiprocessing as mp
 import random
 import time
+
+import psutil
 
 from . import tools
 
@@ -92,6 +95,7 @@ def eaSimple(
     ngen,
     stats=None,
     halloffame=None,
+    nworkers=0,
     verbose=__debug__,
 ):
     """This algorithm reproduce the simplest evolutionary algorithm as
@@ -156,14 +160,27 @@ def eaSimple(
     logbook.header = ["gen", "nevals"] + (stats.fields if stats else [])
 
     ptime = 0.0
+    pool = None
+    if nworkers > 1:
+        pool = mp.Pool(nworkers)
 
     # Evaluate the individuals with an invalid fitness
     invalid_ind = [ind for ind in population if not ind.fitness.valid]
-    start = time.perf_counter()
-    fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+    if pool is None:
+        start = time.process_time()
+        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+        ptime += time.process_time() - start
+    else:
+        start = {p.pid: psutil.Process(p.pid).cpu_times() for p in pool._pool}
+        fitnesses = pool.map(toolbox.evaluate, invalid_ind)
+        end = {p.pid: psutil.Process(p.pid).cpu_times() for p in pool._pool}
+        times = [
+            (et.user + et.system) - (st.user + st.system)
+            for et, st in zip(end.values(), start.values())
+        ]
+        ptime += max(times)
     for ind, fit in zip(invalid_ind, fitnesses):
         ind.fitness.values = fit
-    ptime += time.perf_counter() - start
 
     if halloffame is not None:
         halloffame.update(population)
@@ -183,11 +200,22 @@ def eaSimple(
 
         # Evaluate the individuals with an invalid fitness
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-        start = time.perf_counter()
-        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+        if pool is None:
+            start = time.process_time()
+            fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+            ptime += time.process_time() - start
+        else:
+            start = {p.pid: psutil.Process(p.pid).cpu_times() for p in pool._pool}
+            fitnesses = pool.map(toolbox.evaluate, invalid_ind)
+            end = {p.pid: psutil.Process(p.pid).cpu_times() for p in pool._pool}
+            times = [
+                (et.user + et.system) - (st.user + st.system)
+                for et, st in zip(end.values(), start.values())
+            ]
+            ptime += max(times)
+
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
-        ptime += time.perf_counter() - start
 
         # Update the hall of fame with the generated individuals
         if halloffame is not None:
@@ -201,6 +229,10 @@ def eaSimple(
         logbook.record(gen=gen, nevals=len(invalid_ind), **record)
         if verbose:
             print(logbook.stream)
+
+    if pool is not None:
+        pool.close()
+        pool.join()
 
     return population, logbook, ptime
 
