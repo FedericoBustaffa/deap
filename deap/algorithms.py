@@ -29,6 +29,7 @@ import multiprocessing as mp
 import random
 import time
 
+import numpy as np
 import psutil
 
 from . import tools
@@ -178,7 +179,7 @@ def eaSimple(
             (et.user + et.system) - (st.user + st.system)
             for et, st in zip(end.values(), start.values())
         ]
-        ptime += max(times)
+        ptime += np.mean(times)
     for ind, fit in zip(invalid_ind, fitnesses):
         ind.fitness.values = fit
 
@@ -212,7 +213,7 @@ def eaSimple(
                 (et.user + et.system) - (st.user + st.system)
                 for et, st in zip(end.values(), start.values())
             ]
-            ptime += max(times)
+            ptime += np.mean(times)
 
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
