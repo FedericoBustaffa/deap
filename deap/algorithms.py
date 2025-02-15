@@ -162,8 +162,10 @@ def eaSimple(
 
     ptime = 0.0
     pool = None
+    monitors = {}
     if nworkers > 1:
         pool = mp.Pool(nworkers)
+        monitors = {p.pid: psutil.Process(p.pid) for p in pool._pool}
 
     # Evaluate the individuals with an invalid fitness
     invalid_ind = [ind for ind in population if not ind.fitness.valid]
@@ -172,14 +174,11 @@ def eaSimple(
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
         ptime += time.process_time() - start
     else:
-        start = {p.pid: psutil.Process(p.pid).cpu_times() for p in pool._pool}
+        start = [m.cpu_times().user + m.cpu_times().system for m in monitors]
         fitnesses = pool.map(toolbox.evaluate, invalid_ind)
-        end = {p.pid: psutil.Process(p.pid).cpu_times() for p in pool._pool}
-        times = [
-            (et.user + et.system) - (st.user + st.system)
-            for et, st in zip(end.values(), start.values())
-        ]
-        ptime += np.mean(times)
+        end = [m.cpu_times().user + m.cpu_times().system for m in monitors]
+        ptime += np.mean([e - s for e, s in zip(end, start)])
+
     for ind, fit in zip(invalid_ind, fitnesses):
         ind.fitness.values = fit
 
@@ -206,14 +205,10 @@ def eaSimple(
             fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
             ptime += time.process_time() - start
         else:
-            start = {p.pid: psutil.Process(p.pid).cpu_times() for p in pool._pool}
+            start = [m.cpu_times().user + m.cpu_times().system for m in monitors]
             fitnesses = pool.map(toolbox.evaluate, invalid_ind)
-            end = {p.pid: psutil.Process(p.pid).cpu_times() for p in pool._pool}
-            times = [
-                (et.user + et.system) - (st.user + st.system)
-                for et, st in zip(end.values(), start.values())
-            ]
-            ptime += np.mean(times)
+            end = [m.cpu_times().user + m.cpu_times().system for m in monitors]
+            ptime += np.mean([e - s for e, s in zip(end, start)])
 
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
