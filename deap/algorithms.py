@@ -165,7 +165,7 @@ def eaSimple(
     monitors = {}
     if nworkers > 1:
         pool = mp.Pool(nworkers)
-        monitors = {p.pid: psutil.Process(p.pid) for p in pool._pool}
+        monitors = [psutil.Process(p.pid) for p in pool._pool]
 
     # Evaluate the individuals with an invalid fitness
     invalid_ind = [ind for ind in population if not ind.fitness.valid]
