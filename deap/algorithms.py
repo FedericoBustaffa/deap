@@ -25,11 +25,8 @@ You are encouraged to write your own algorithms in order to make them do what
 you really want them to do.
 """
 
-import multiprocessing as mp
 import random
 import time
-
-import psutil
 
 from . import tools
 
@@ -95,7 +92,6 @@ def eaSimple(
     ngen,
     stats=None,
     halloffame=None,
-    nworkers=0,
     verbose=__debug__,
 ):
     """This algorithm reproduce the simplest evolutionary algorithm as
@@ -160,23 +156,12 @@ def eaSimple(
     logbook.header = ["gen", "nevals"] + (stats.fields if stats else [])
 
     ptime = 0.0
-    pool = None
-    monitors = {}
-    if nworkers > 1:
-        pool = mp.Pool(nworkers)
-        monitors = [psutil.Process(p.pid) for p in pool._pool]
 
     # Evaluate the individuals with an invalid fitness
     invalid_ind = [ind for ind in population if not ind.fitness.valid]
-    if pool is None:
-        start = time.process_time()
-        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-        ptime += time.process_time() - start
-    else:
-        start = [m.cpu_times().user + m.cpu_times().system for m in monitors]
-        fitnesses = pool.map(toolbox.evaluate, invalid_ind)
-        end = [m.cpu_times().user + m.cpu_times().system for m in monitors]
-        ptime += max([e - s for e, s in zip(end, start)])
+    start = time.perf_counter()
+    fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+    ptime += time.perf_counter() - start
 
     for ind, fit in zip(invalid_ind, fitnesses):
         ind.fitness.values = fit
@@ -199,15 +184,9 @@ def eaSimple(
 
         # Evaluate the individuals with an invalid fitness
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-        if pool is None:
-            start = time.process_time()
-            fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-            ptime += time.process_time() - start
-        else:
-            start = [m.cpu_times().user + m.cpu_times().system for m in monitors]
-            fitnesses = pool.map(toolbox.evaluate, invalid_ind)
-            end = [m.cpu_times().user + m.cpu_times().system for m in monitors]
-            ptime += max([e - s for e, s in zip(end, start)])
+        start = time.perf_counter()
+        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+        ptime += time.perf_counter() - start
 
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
@@ -224,10 +203,6 @@ def eaSimple(
         logbook.record(gen=gen, nevals=len(invalid_ind), **record)
         if verbose:
             print(logbook.stream)
-
-    if pool is not None:
-        pool.close()
-        pool.join()
 
     return population, logbook, ptime
 
