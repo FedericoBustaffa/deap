@@ -29,7 +29,6 @@ import multiprocessing as mp
 import random
 import time
 
-import numpy as np
 import psutil
 
 from . import tools
@@ -177,7 +176,7 @@ def eaSimple(
         start = [m.cpu_times().user + m.cpu_times().system for m in monitors]
         fitnesses = pool.map(toolbox.evaluate, invalid_ind)
         end = [m.cpu_times().user + m.cpu_times().system for m in monitors]
-        ptime += np.mean([e - s for e, s in zip(end, start)])
+        ptime += max([e - s for e, s in zip(end, start)])
 
     for ind, fit in zip(invalid_ind, fitnesses):
         ind.fitness.values = fit
@@ -208,7 +207,7 @@ def eaSimple(
             start = [m.cpu_times().user + m.cpu_times().system for m in monitors]
             fitnesses = pool.map(toolbox.evaluate, invalid_ind)
             end = [m.cpu_times().user + m.cpu_times().system for m in monitors]
-            ptime += np.mean([e - s for e, s in zip(end, start)])
+            ptime += max([e - s for e, s in zip(end, start)])
 
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
