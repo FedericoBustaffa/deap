@@ -153,7 +153,7 @@ def eaSimple(
        Basic Algorithms and Operators", 2000.
     """
     logbook = tools.Logbook()
-    logbook.header = ["gen", "nevals"] + (stats.fields if stats else [])
+    logbook.header = ["gen", "nevals", "ptime"] + (stats.fields if stats else [])
 
     ptime = 0.0
 
@@ -161,16 +161,15 @@ def eaSimple(
     invalid_ind = [ind for ind in population if not ind.fitness.valid]
     start = time.perf_counter()
     fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-    ptime += time.perf_counter() - start
-
     for ind, fit in zip(invalid_ind, fitnesses):
         ind.fitness.values = fit
+    ptime += time.perf_counter() - start
 
     if halloffame is not None:
         halloffame.update(population)
 
     record = stats.compile(population) if stats else {}
-    logbook.record(gen=0, nevals=len(invalid_ind), **record)
+    logbook.record(gen=0, nevals=len(invalid_ind), ptime=ptime, **record)
     if verbose:
         print(logbook.stream)
 
@@ -186,10 +185,9 @@ def eaSimple(
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
         start = time.perf_counter()
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-        ptime += time.perf_counter() - start
-
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
+        ptime += time.perf_counter() - start
 
         # Update the hall of fame with the generated individuals
         if halloffame is not None:
@@ -200,7 +198,7 @@ def eaSimple(
 
         # Append the current generation statistics to the logbook
         record = stats.compile(population) if stats else {}
-        logbook.record(gen=gen, nevals=len(invalid_ind), **record)
+        logbook.record(gen=gen, nevals=len(invalid_ind), ptime=ptime, **record)
         if verbose:
             print(logbook.stream)
 
