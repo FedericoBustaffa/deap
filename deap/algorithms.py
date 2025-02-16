@@ -25,8 +25,11 @@ You are encouraged to write your own algorithms in order to make them do what
 you really want them to do.
 """
 
+import multiprocessing as mp
 import random
 import time
+
+import psutil
 
 from . import tools
 
@@ -92,6 +95,7 @@ def eaSimple(
     ngen,
     stats=None,
     halloffame=None,
+    nworkers=1,
     verbose=__debug__,
 ):
     """This algorithm reproduce the simplest evolutionary algorithm as
@@ -156,14 +160,34 @@ def eaSimple(
     logbook.header = ["gen", "nevals", "ptime"] + (stats.fields if stats else [])
 
     ptime = 0.0
+    pool = None
+    monitors = dict()
+    if nworkers > 1:
+        pool = mp.Pool(processes=nworkers)
+        monitors = {p.pid: psutil.Process(p.pid) for p in pool._pool}
+        toolbox.register("map", pool.map)
 
     # Evaluate the individuals with an invalid fitness
     invalid_ind = [ind for ind in population if not ind.fitness.valid]
-    start = time.perf_counter()
-    fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-    for ind, fit in zip(invalid_ind, fitnesses):
-        ind.fitness.values = fit
-    ptime += time.perf_counter() - start
+
+    if nworkers <= 1:
+        start = time.process_time()
+        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+        for ind, fit in zip(invalid_ind, fitnesses):
+            ind.fitness.values = fit
+        ptime += time.process_time() - start
+    else:
+        start = {p.pid: monitors[p.pid].cpu_times() for p in pool._pool}
+        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+        for ind, fit in zip(invalid_ind, fitnesses):
+            ind.fitness.values = fit
+        end = {p.pid: monitors[p.pid].cpu_times() for p in pool._pool}
+        ptime += max(
+            [
+                (e.user + e.system) - (s.user + s.system)
+                for s, e in zip(start.values(), end.values())
+            ]
+        )
 
     if halloffame is not None:
         halloffame.update(population)
@@ -183,11 +207,24 @@ def eaSimple(
 
         # Evaluate the individuals with an invalid fitness
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-        start = time.perf_counter()
-        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-        for ind, fit in zip(invalid_ind, fitnesses):
-            ind.fitness.values = fit
-        ptime += time.perf_counter() - start
+        if nworkers <= 1:
+            start = time.process_time()
+            fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+            for ind, fit in zip(invalid_ind, fitnesses):
+                ind.fitness.values = fit
+            ptime += time.process_time() - start
+        else:
+            start = {p.pid: monitors[p.pid].cpu_times() for p in pool._pool}
+            fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+            for ind, fit in zip(invalid_ind, fitnesses):
+                ind.fitness.values = fit
+            end = {p.pid: monitors[p.pid].cpu_times() for p in pool._pool}
+            ptime += max(
+                [
+                    (e.user + e.system) - (s.user + s.system)
+                    for s, e in zip(start.values(), end.values())
+                ]
+            )
 
         # Update the hall of fame with the generated individuals
         if halloffame is not None:
